@@ -373,51 +373,42 @@
   body.intro-active .wrap { transform: scale(0.9); opacity: 0; }
 
   .intro { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; overflow: hidden; }
-  .doors { position: absolute; inset: 0; perspective: 1800px; }
+  .doors { position: absolute; inset: 0; perspective: 2200px; background: #05080b; }
   .door {
-    position: absolute; top: 0; bottom: 0; width: 50.5%;
-    background:
-      repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 64px),
-      linear-gradient(180deg, rgba(255,70,85,0.08), transparent 30%, transparent 70%, rgba(255,70,85,0.06)),
-      linear-gradient(90deg, #0d151d, #16212c);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
-    transition: transform 1.5s cubic-bezier(.6,0,.2,1);
+    position: absolute; top: 0; bottom: 0; width: 50%;
+    background: linear-gradient(90deg, #141c24, #1a242e 50%, #141c24);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04), inset 0 0 60px rgba(0,0,0,0.5);
+    transition: transform 1.8s cubic-bezier(.65,0,.25,1);
     will-change: transform;
     backface-visibility: hidden;
   }
-  .door::before {
-    content: ""; position: absolute; top: 14%; bottom: 14%; width: 3px; background: var(--red);
-    box-shadow: 0 0 18px var(--red-glow);
+  /* two classic raised panels per door */
+  .door::before, .door::after {
+    content: ""; position: absolute; left: 14%; right: 14%;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #1c2731, #16202a);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.05),
+      inset 0 0 0 7px #121a22,
+      inset 0 0 0 8px rgba(255,255,255,0.04),
+      0 1px 0 rgba(255,255,255,0.03), 0 -1px 0 rgba(0,0,0,0.4);
   }
-  .door::after {
-    content: ""; position: absolute; inset: 7% 10%;
-    border: 1px solid rgba(255,255,255,0.06);
-    clip-path: polygon(24px 0, 100% 0, 100% calc(100% - 24px), calc(100% - 24px) 100%, 0 100%, 0 24px);
-    background: linear-gradient(135deg, rgba(255,255,255,0.03), transparent 50%);
-  }
-  .door.left { left: 0; transform-origin: left center; background-position: 0 0; }
-  .door.right { right: 0; transform-origin: right center; transform: scaleX(1); }
-  .door.left::before { left: 6%; }
-  .door.right::before { right: 6%; }
+  .door::before { top: 7%; height: 46%; }
+  .door::after { top: 58%; bottom: 7%; }
+  .door.left { left: 0; transform-origin: left center; box-shadow: inset -1px 0 0 rgba(0,0,0,0.6), inset 0 0 60px rgba(0,0,0,0.5); }
+  .door.right { right: 0; transform-origin: right center; box-shadow: inset 1px 0 0 rgba(0,0,0,0.6), inset 0 0 60px rgba(0,0,0,0.5); }
   .door .handle {
-    position: absolute; top: 50%; width: 10px; height: 90px; margin-top: -45px; border-radius: 6px; z-index: 1;
-    background: linear-gradient(180deg, #3a4856, #1d2731);
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 6px 14px rgba(0,0,0,0.5);
+    position: absolute; top: 55%; width: 16px; height: 16px; margin-top: -8px; border-radius: 50%; z-index: 1;
+    background: radial-gradient(circle at 35% 30%, #d9dee3, #7d8791 60%, #3e464e);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.6);
   }
-  .door.left .handle { right: 22px; }
-  .door.right .handle { left: 22px; }
-
-  .seam {
-    position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%);
-    background: var(--red); box-shadow: 0 0 12px 2px var(--red-glow);
-    opacity: 0.35; transition: opacity 0.4s, box-shadow 0.4s, width 0.4s;
+  .door .handle::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%);
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.08), rgba(0,0,0,0.25) 70%);
+    z-index: -1;
   }
-  .burst {
-    position: absolute; left: 50%; top: 50%; width: 10px; height: 100%;
-    transform: translate(-50%, -50%);
-    background: radial-gradient(ellipse at center, rgba(255,240,240,0.95), rgba(255,70,85,0.5) 40%, transparent 70%);
-    opacity: 0; pointer-events: none;
-  }
+  .door.left .handle { right: 5%; }
+  .door.right .handle { left: 5%; }
 
   .intro-content {
     position: relative; z-index: 2; width: min(100%, 560px); text-align: center;
@@ -454,27 +445,15 @@
   .enter-btn { margin-top: 18px; padding: 14px 56px; font-size: 26px; }
 
   /* opening sequence */
-  .intro.opening .intro-content { opacity: 0; transform: scale(0.92) translateY(10px); pointer-events: none; }
-  .intro.unlock .seam { opacity: 1; width: 4px; box-shadow: 0 0 30px 8px var(--red-glow), 0 0 80px 20px rgba(255,70,85,0.3); }
-  .intro.unlock .door.left { animation: rattleL 0.45s ease; }
-  .intro.unlock .door.right { animation: rattleR 0.45s ease; }
-  @keyframes rattleL { 30% { transform: translateX(-8px); } 60% { transform: translateX(-3px); } 100% { transform: translateX(-10px); } }
-  @keyframes rattleR { 30% { transform: translateX(8px); } 60% { transform: translateX(3px); } 100% { transform: translateX(10px); } }
-  .intro.open .door.left { transform: translateX(-10px) rotateY(-108deg); animation: none; }
-  .intro.open .door.right { transform: translateX(10px) rotateY(108deg); animation: none; }
-  .intro.open .seam { opacity: 0; }
-  .intro.open .burst { animation: burst 1.3s ease-out forwards; }
-  @keyframes burst {
-    0% { opacity: 0; width: 10px; }
-    25% { opacity: 1; width: 60vw; }
-    100% { opacity: 0; width: 140vw; }
-  }
+  .intro.opening .intro-content { opacity: 0; transform: scale(0.96); pointer-events: none; }
+  .intro.open .door.left { transform: rotateY(-100deg); }
+  .intro.open .door.right { transform: rotateY(100deg); }
+  .intro.open .doors { background: transparent; transition: background 0.6s ease 0.2s; }
   .intro.gone { display: none; }
 
   @media (max-width: 640px) {
     .intro-content { padding: 32px 20px 28px; }
     .intro-text { font-size: 15px; }
-    .door .handle { height: 60px; margin-top: -30px; }
   }
 
   @media (max-width: 640px) {
@@ -497,8 +476,6 @@
   <div class="doors" aria-hidden="true">
     <div class="door left"><span class="handle"></span></div>
     <div class="door right"><span class="handle"></span></div>
-    <div class="seam"></div>
-    <div class="burst"></div>
   </div>
   <div class="intro-content">
     <div class="eyebrow">Classified invitation</div>
@@ -1006,15 +983,14 @@ enterBtn.focus();
 enterBtn.addEventListener("click", () => {
   enterBtn.disabled = true;
   intro.classList.add("opening");
-  setTimeout(() => intro.classList.add("unlock"), 450);
   setTimeout(() => {
     intro.classList.add("open");
     document.body.classList.remove("intro-active");
-  }, 950);
+  }, 500);
   setTimeout(() => {
     intro.classList.add("gone");
     spinBtn.focus();
-  }, 2600);
+  }, 2400);
 });
 
 buildWheel();
