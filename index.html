@@ -451,7 +451,43 @@
   .intro.open .doors { background: transparent; transition: background 0.6s ease 0.2s; }
   .intro.gone { display: none; }
 
+  /* ---------- Music widget ---------- */
+  .music {
+    position: fixed; left: 16px; bottom: 16px; z-index: 45;
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px 8px 8px;
+    background: rgba(15, 25, 35, 0.92); border: 1px solid var(--line);
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    opacity: 0; transform: translateY(20px); pointer-events: none;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .music.show { opacity: 1; transform: none; pointer-events: auto; }
+  .mute-btn {
+    width: 34px; height: 34px; display: grid; place-items: center;
+    background: rgba(255,70,85,0.15); color: var(--red);
+    transition: background 0.2s;
+  }
+  .mute-btn:hover { background: rgba(255,70,85,0.28); }
+  .music.muted .mute-btn { color: var(--muted); background: var(--panel); }
+  .music-label { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .music.playing:not(.muted) .music-label::before {
+    content: "♪ "; color: var(--red); display: inline-block; animation: note 0.6s ease-in-out infinite alternate;
+  }
+  @keyframes note { to { transform: translateY(-3px); } }
+  #volume {
+    -webkit-appearance: none; appearance: none; width: 110px; height: 4px; border-radius: 4px; cursor: pointer;
+    background: linear-gradient(90deg, var(--red) var(--fill, 25%), rgba(255,255,255,0.15) var(--fill, 25%));
+  }
+  #volume::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: #fff; border: 3px solid var(--red); cursor: pointer;
+  }
+  #volume::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 3px solid var(--red); cursor: pointer; }
+
   @media (max-width: 640px) {
+    .music-label { display: none; }
+    .toast { bottom: 76px; }
+    #volume { width: 90px; }
     .intro-content { padding: 32px 20px 28px; }
     .intro-text { font-size: 15px; }
   }
@@ -595,6 +631,15 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="music" id="music" aria-label="Music controls">
+  <button class="mute-btn" id="muteBtn" aria-label="Mute music">
+    <svg id="iconOn" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+    <svg id="iconOff" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z" fill="currentColor"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>
+  </button>
+  <input type="range" id="volume" min="0" max="100" value="25" aria-label="Music volume">
+  <span class="music-label">La Cucaracha</span>
+</div>
 
 <script>
 /* =========================================================
@@ -976,12 +1021,109 @@ function tick() {
   raf = parts.length ? requestAnimationFrame(tick) : (cx.clearRect(0, 0, innerWidth, innerHeight), null);
 }
 
+/* ---------- Music: La Cucaracha, synthesized live ---------- */
+const BPM = 200, BEAT = 60 / BPM;
+// [midi note, length in beats] — melody of the traditional folk tune, key of F
+const MELODY = [
+  [72,.5],[72,.5],[72,.5],[77,1],[81,1.5],
+  [72,.5],[72,.5],[72,.5],[77,1],[81,1.5],
+  [77,.5],[77,.5],[76,.5],[76,.5],[74,.5],[74,.5],[72,2],[null,1],
+  [72,.5],[72,.5],[72,.5],[76,1],[79,1.5],
+  [72,.5],[72,.5],[72,.5],[76,1],[79,1.5],
+  [84,.5],[86,.5],[84,.5],[82,.5],[81,.5],[79,.5],[77,2],[null,1],
+];
+const LOOP_BEATS = MELODY.reduce((s, [, d]) => s + d, 0);
+const F_CHORD = { bass: [41, 48], stab: [53, 57, 60] };
+const C7_CHORD = { bass: [36, 43], stab: [52, 55, 58] };
+const chordAt = b => (b < 8 || b >= 22 ? F_CHORD : C7_CHORD);
+const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+
+let actx, master, musicTimer, nextLoopAt = 0, muted = false;
+const volumeEl = document.getElementById("volume");
+const musicEl = document.getElementById("music");
+const volFromSlider = () => Math.pow(volumeEl.value / 100, 2) * 0.6;
+
+function voice(type, freq, t, dur, peak, cutoff) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = freq;
+  let out = o;
+  if (cutoff) {
+    const f = actx.createBiquadFilter();
+    f.type = "lowpass"; f.frequency.value = cutoff;
+    o.connect(f); out = f;
+  }
+  out.connect(g); g.connect(master);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(peak * 0.55, t + dur * 0.4);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+
+function scheduleLoop(start) {
+  let b = 0;
+  for (const [note, len] of MELODY) {
+    if (note) {
+      const t = start + b * BEAT, d = len * BEAT * 0.92;
+      voice("sawtooth", hz(note), t, d, 0.16, 2200);
+      voice("square", hz(note) * 1.003, t, d, 0.05, 1600);
+    }
+    b += len;
+  }
+  // oom-pah accompaniment
+  for (let beat = 0; beat < LOOP_BEATS; beat++) {
+    const c = chordAt(beat), t = start + beat * BEAT;
+    if (beat % 2 === 0) voice("triangle", hz(c.bass[(beat / 2) % 2]), t, BEAT * 0.9, 0.35);
+    else c.stab.forEach(n => voice("square", hz(n), t, BEAT * 0.45, 0.025, 1400));
+  }
+}
+
+function startMusic() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  } catch { return; }
+  actx.resume();
+  master = master || actx.createGain();
+  master.connect(actx.destination);
+  master.gain.value = 0.0001;
+  master.gain.setTargetAtTime(muted ? 0 : volFromSlider(), actx.currentTime, 0.8);
+  nextLoopAt = actx.currentTime + 0.3;
+  clearInterval(musicTimer);
+  musicTimer = setInterval(() => {
+    if (actx.currentTime > nextLoopAt - 1) {
+      scheduleLoop(nextLoopAt);
+      nextLoopAt += LOOP_BEATS * BEAT;
+    }
+  }, 200);
+  musicEl.classList.add("show", "playing");
+}
+
+function applyVolume() {
+  volumeEl.style.setProperty("--fill", volumeEl.value + "%");
+  if (master) master.gain.setTargetAtTime(muted ? 0 : volFromSlider(), actx.currentTime, 0.05);
+}
+function setMuted(m) {
+  muted = m;
+  musicEl.classList.toggle("muted", m);
+  document.getElementById("iconOn").classList.toggle("hidden", m);
+  document.getElementById("iconOff").classList.toggle("hidden", !m);
+  document.getElementById("muteBtn").setAttribute("aria-label", m ? "Unmute music" : "Mute music");
+  applyVolume();
+}
+volumeEl.addEventListener("input", () => {
+  if (muted && volumeEl.value > 0) setMuted(false);
+  else applyVolume();
+});
+document.getElementById("muteBtn").addEventListener("click", () => setMuted(!muted));
+applyVolume();
+
 /* ---------- Intro door ---------- */
 const intro = document.getElementById("intro");
 const enterBtn = document.getElementById("enterBtn");
 enterBtn.focus();
 enterBtn.addEventListener("click", () => {
   enterBtn.disabled = true;
+  startMusic();
   intro.classList.add("opening");
   setTimeout(() => {
     intro.classList.add("open");
